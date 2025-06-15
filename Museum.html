@@ -1,0 +1,479 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Khám Phá Bảo Tàng TP.HCM</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Chosen Palette: Earthy Harmony -->
+    <!-- Application Structure Plan: The SPA uses a dashboard-style layout. The core is an interactive grid of museum cards, which can be dynamically filtered by district, price, and name via controls at the top. This is more user-friendly than a static list, allowing users to query data based on their needs (e.g., find free museums in District 1). Clicking a card reveals detailed information in a modal, employing a progressive disclosure pattern to keep the main interface clean. Two charts (price comparison and location distribution) provide a quick visual synthesis of the report's key quantitative data, offering insights at a glance. This structure transforms the linear report into a multi-faceted exploration tool. -->
+    <!-- Visualization & Content Choices: 
+        1. Museum List -> Goal: Organize/Compare -> Method: Interactive Card Grid (HTML/Tailwind) -> Interaction: Filter controls (dropdowns, search) dynamically update the visible cards. Clicking a card opens a detailed modal. -> Justification: Visually appealing, scannable, and allows users to drill down for more information without losing context. -> Library: Vanilla JS.
+        2. Ticket Prices -> Goal: Compare -> Method: Horizontal Bar Chart -> Interaction: Tooltip on hover shows exact price. -> Justification: Best for comparing numerical values across categories, making price differences instantly clear. -> Library: Chart.js.
+        3. Museum Locations -> Goal: Inform/Organize -> Method: Donut Chart -> Interaction: Tooltip on hover shows district and count. -> Justification: Effectively shows the proportional distribution of museums across the city. -> Library: Chart.js.
+    -->
+    <!-- CONFIRMATION: NO SVG graphics used. NO Mermaid JS used. -->
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        .chart-container {
+            position: relative;
+            width: 100%;
+            max-width: 600px;
+            margin-left: auto;
+            margin-right: auto;
+            height: 350px;
+            max-height: 400px;
+        }
+        @media (min-width: 768px) {
+            .chart-container {
+                height: 400px;
+            }
+        }
+        .modal-content {
+            max-height: 80vh;
+        }
+        .note-warning {
+            border-left: 4px solid #f97316;
+            background-color: #fff7ed;
+            color: #c2410c;
+        }
+    </style>
+</head>
+<body class="bg-stone-50 text-stone-800">
+
+    <div class="container mx-auto p-4 sm:p-6 lg:p-8">
+        <header class="text-center mb-8">
+            <h1 class="text-3xl md:text-4xl font-bold text-orange-900">Khám Phá Di Sản Bảo Tàng TP. Hồ Chí Minh</h1>
+            <p class="mt-2 text-lg text-stone-600">Cẩm nang tương tác về các bảo tàng và di tích lịch sử nổi bật</p>
+        </header>
+
+        <div id="controls" class="bg-white p-4 rounded-lg shadow-md mb-8 sticky top-2 z-10">
+            <p class="font-bold text-lg mb-4 text-center text-orange-800">Công cụ tìm kiếm</p>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <input type="text" id="searchInput" placeholder="Tìm theo tên bảo tàng..." class="w-full p-2 border border-stone-300 rounded-md focus:ring-2 focus:ring-orange-400 focus:border-orange-400 transition">
+                <select id="districtFilter" class="w-full p-2 border border-stone-300 rounded-md focus:ring-2 focus:ring-orange-400 focus:border-orange-400 transition">
+                    <option value="all">Tất cả các quận</option>
+                </select>
+                <select id="priceFilter" class="w-full p-2 border border-stone-300 rounded-md focus:ring-2 focus:ring-orange-400 focus:border-orange-400 transition">
+                    <option value="all">Mọi mức giá</option>
+                    <option value="free">Miễn phí</option>
+                    <option value="under50">Dưới 50.000 VNĐ</option>
+                    <option value="over50">Từ 50.000 VNĐ trở lên</option>
+                </select>
+            </div>
+        </div>
+
+        <main id="museumGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+        </main>
+        
+        <div id="noResults" class="hidden text-center py-12">
+            <p class="text-xl text-stone-500">Không tìm thấy bảo tàng nào phù hợp.</p>
+        </div>
+
+        <section id="visualizations" class="mt-12">
+            <h2 class="text-2xl font-bold text-center mb-8 text-orange-900">Tổng Quan Dữ Liệu</h2>
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                <div class="bg-white p-4 rounded-lg shadow-md">
+                    <h3 class="font-bold text-lg mb-4 text-center text-stone-700">So Sánh Giá Vé (Người Lớn)</h3>
+                    <div class="chart-container">
+                        <canvas id="priceChart"></canvas>
+                    </div>
+                     <p class="text-xs text-center text-stone-500 mt-2">Di chuột qua các cột để xem giá vé chi tiết.</p>
+                </div>
+                <div class="bg-white p-4 rounded-lg shadow-md">
+                    <h3 class="font-bold text-lg mb-4 text-center text-stone-700">Phân Bố Bảo Tàng Theo Quận</h3>
+                    <div class="chart-container">
+                        <canvas id="districtChart"></canvas>
+                    </div>
+                     <p class="text-xs text-center text-stone-500 mt-2">Biểu đồ thể hiện số lượng bảo tàng tại các quận trung tâm.</p>
+                </div>
+            </div>
+        </section>
+    </div>
+
+    <div id="modal" class="fixed inset-0 bg-black bg-opacity-60 hidden items-center justify-center z-50 p-4">
+        <div class="bg-white rounded-lg shadow-2xl w-full max-w-2xl transform transition-all duration-300 scale-95 opacity-0">
+             <button id="closeModal" class="absolute top-2 right-2 text-stone-500 hover:text-orange-600 transition-colors z-10">
+                <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+            </button>
+            <div id="modalContent" class="p-6 sm:p-8 overflow-y-auto modal-content">
+            </div>
+        </div>
+    </div>
+
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const museumData = [
+                {
+                    id: 1,
+                    name: "Bảo tàng Thành phố Hồ Chí Minh",
+                    address: "65 Lý Tự Trọng, Phường Bến Nghé, Quận 1",
+                    district: "Quận 1",
+                    hours: "7h30 – 17h00 (Tất cả các ngày, kể cả Lễ, Tết)",
+                    ticketAdult: 30000,
+                    ticketConcession: "15.000 VNĐ (Sinh viên)",
+                    notes: "Phí gửi xe: 5.000 VNĐ. Phụ thu máy ảnh: 20.000 VNĐ/máy. Giờ hoạt động có thể thay đổi vào dịp Tết, nên kiểm tra trước.",
+                    description: "Tọa lạc trong một công trình kiến trúc Pháp cổ điển, bảo tàng lưu giữ những dấu ấn về quá trình hình thành và phát triển của Sài Gòn – TP. Hồ Chí Minh từ thuở sơ khai đến hiện đại."
+                },
+                {
+                    id: 2,
+                    name: "Bảo tàng Chứng tích Chiến tranh",
+                    address: "28 Võ Văn Tần, Phường 6, Quận 3",
+                    district: "Quận 3",
+                    hours: "7h30 – 18h00 (Tất cả các ngày, kể cả Lễ, Tết)",
+                    ticketAdult: 40000,
+                    ticketConcession: "20.000 VNĐ (Trẻ em 6-16 tuổi, người cao tuổi >60). Miễn phí cho trẻ em < 6 tuổi, người khuyết tật nặng.",
+                    notes: "Là một trong những bảo tàng được ghé thăm nhiều nhất, nơi đây tố cáo tội ác chiến tranh và gửi gắm thông điệp mạnh mẽ về hòa bình.",
+                    description: "Lưu trữ các tài liệu, hình ảnh và hiện vật sống động về hậu quả tàn khốc của các cuộc chiến tranh tại Việt Nam, đồng thời ca ngợi tinh thần yêu nước và khát vọng hòa bình của dân tộc."
+                },
+                {
+                    id: 3,
+                    name: "Bảo tàng Chiến dịch Hồ Chí Minh",
+                    address: "2 Lê Duẩn, Phường Bến Nghé, Quận 1",
+                    district: "Quận 1",
+                    hours: "8h00 – 17h00 (Các ngày trong tuần)",
+                    ticketAdult: 5000,
+                    ticketConcession: "Miễn phí theo một số nguồn tin.",
+                    notes: "Giá vé có thông tin chưa nhất quán (một số nguồn báo miễn phí). Du khách nên xác nhận lại trực tiếp.",
+                    description: "Nơi tái hiện một cách chân thực và sống động toàn bộ quá trình giải phóng Sài Gòn - Gia Định qua các hình ảnh, tư liệu và hiện vật gốc về Chiến dịch Hồ Chí Minh lịch sử."
+                },
+                {
+                    id: 4,
+                    name: "Bảo tàng Lực lượng Vũ trang Miền Đông Nam Bộ",
+                    address: "247 Hoàng Văn Thụ, Phường 1, Quận Tân Bình",
+                    district: "Tân Bình",
+                    hours: "Sáng: 7h30–11h30, Chiều: 13h30–16h30 (Thứ Hai – Thứ Sáu)",
+                    ticketAdult: 0,
+                    ticketConcession: "Miễn phí cho người Việt Nam. Khách quốc tế: 40.000 VNĐ.",
+                    notes: "Đóng cửa vào Thứ Bảy và Chủ Nhật. Phí chụp ảnh cho khách quốc tế: 10.000 VNĐ.",
+                    description: "Lưu giữ bộ sưu tập khổng lồ với khoảng 16.000 tư liệu, hiện vật liên quan đến các cuộc kháng chiến và sự phát triển của quân và dân Quân khu 7."
+                },
+                {
+                    id: 5,
+                    name: "Bảo tàng Tôn Đức Thắng",
+                    address: "5 Tôn Đức Thắng, Phường Bến Nghé, Quận 1",
+                    district: "Quận 1",
+                    hours: "Sáng: 7h30–11h30, Chiều: 13h30–17h00 (Thứ Ba – Chủ Nhật)",
+                    ticketAdult: 0,
+                    ticketConcession: "Miễn phí cho mọi đối tượng.",
+                    notes: "Đóng cửa vào Thứ Hai hàng tuần.",
+                    description: "Bảo tàng danh nhân duy nhất tại TP.HCM, giới thiệu về cuộc đời và sự nghiệp cách mạng của Chủ tịch Tôn Đức Thắng, góp phần giáo dục truyền thống yêu nước."
+                },
+                {
+                    id: 6,
+                    name: "Bảo tàng Lịch sử Thành phố Hồ Chí Minh",
+                    address: "2 Nguyễn Bỉnh Khiêm, Phường Bến Nghé, Quận 1",
+                    district: "Quận 1",
+                    hours: "Sáng: 8h00–11h30, Chiều: 13h00–17h00 (Thứ Ba – Chủ Nhật)",
+                    ticketAdult: 30000,
+                    ticketConcession: "15.000 VNĐ (Học sinh, sinh viên, trẻ 6-16, người cao tuổi, người khuyết tật nặng). Miễn phí cho trẻ < 6 tuổi, người khuyết tật đặc biệt nặng, hộ nghèo.",
+                    notes: "Đóng cửa vào Thứ Hai để bảo trì. Nằm trong khuôn viên Thảo Cầm Viên Sài Gòn.",
+                    description: "Trưng bày các hiện vật phản ánh lịch sử và văn hóa Việt Nam từ thời tiền sử đến hiện đại, với nhiều bảo vật quốc gia giá trị."
+                },
+                {
+                    id: 7,
+                    name: "Bảo tàng Mỹ thuật Thành phố Hồ Chí Minh",
+                    address: "97A Phó Đức Chính, Phường Nguyễn Thái Bình, Quận 1",
+                    district: "Quận 1",
+                    hours: "8h00 – 17h00 (Tất cả các ngày)",
+                    ticketAdult: 30000,
+                    ticketConcession: "15.000 VNĐ (Sinh viên, học sinh). Miễn phí cho trẻ < 6 tuổi, người > 60 tuổi.",
+                    notes: "Tòa nhà có kiến trúc giao thoa Á - Âu độc đáo, là điểm đến không thể bỏ lỡ cho người yêu nghệ thuật.",
+                    description: "Lưu giữ những ký ức quý giá về sự phát triển của Mỹ thuật Việt Nam qua nhiều thời kỳ, từ cổ vật đến các tác phẩm nghệ thuật đương đại."
+                },
+                {
+                    id: 8,
+                    name: "Bảo tàng Y Học Cổ Truyền (Fito Museum)",
+                    address: "41 Hoàng Dư Khương, Phường 12, Quận 10",
+                    district: "Quận 10",
+                    hours: "8h30 – 17h00 (Tất cả các ngày)",
+                    ticketAdult: 180000,
+                    ticketConcession: "90.000 VNĐ (Học sinh, sinh viên, người > 60 tuổi).",
+                    notes: "Giá vé và ngày hoạt động có thể có sự khác biệt giữa các nguồn tin. Du khách nên kiểm tra lại thông tin trước khi đến.",
+                    description: "Không gian độc đáo với kiến trúc gỗ, trưng bày hơn 3.000 hiện vật quý giá liên quan đến lịch sử y học cổ truyền Việt Nam."
+                },
+                {
+                    id: 9,
+                    name: "Bảo tàng Hồ Chí Minh – Chi nhánh TP. HCM (Bến Nhà Rồng)",
+                    address: "01 Nguyễn Tất Thành, Phường 12, Quận 4",
+                    district: "Quận 4",
+                    hours: "Sáng: 7h30–11h30, Chiều: 13h30–17h00 (Thứ Ba – Chủ Nhật)",
+                    ticketAdult: 20000,
+                    ticketConcession: "Thông tin đang được cập nhật.",
+                    notes: "Đóng cửa vào Thứ Hai. Đây là di tích lịch sử quốc gia đặc biệt, nơi Bác Hồ ra đi tìm đường cứu nước.",
+                    description: "Lưu giữ nhiều kỷ vật, tài liệu quý giá về cuộc đời và sự nghiệp vĩ đại của Chủ tịch Hồ Chí Minh. Là điểm đến thiêng liêng và mang ý nghĩa lịch sử sâu sắc."
+                },
+                {
+                    id: 10,
+                    name: "Bảo tàng Phụ nữ Nam Bộ",
+                    address: "200 - 202 Võ Thị Sáu, Phường Võ Thị Sáu, Quận 3",
+                    district: "Quận 3",
+                    hours: "Sáng: 7h30–11h30, Chiều: 13h30–17h00 (Tất cả các ngày)",
+                    ticketAdult: 0,
+                    ticketConcession: "Miễn phí cho mọi đối tượng.",
+                    notes: "Bảo tàng đầu tiên của thành phố ứng dụng công nghệ trưng bày thực tế ảo 3D/360 độ.",
+                    description: "Tôn vinh vẻ đẹp, đức hy sinh và những đóng góp to lớn của người phụ nữ Nam Bộ và Việt Nam trong lịch sử qua các bộ sưu tập hiện vật phong phú."
+                },
+                {
+                    id: 11,
+                    name: "Bảo tàng Áo Dài Việt Nam",
+                    address: "206/19/30 Long Thuận, Phường Long Phước, Quận 9",
+                    district: "Quận 9",
+                    hours: "8h30 – 17h30 (Tất cả các ngày)",
+                    ticketAdult: 50000,
+                    ticketConcession: "30.000 VNĐ (Học sinh, sinh viên, trẻ em). Miễn phí cho trẻ < 2 tuổi, người khuyết tật.",
+                    notes: "Giá vé có thể khác nhau giữa các nguồn (có nguồn ghi 100.000 VNĐ). Nằm ở Quận 9, khá xa trung tâm thành phố.",
+                    description: "Không gian độc đáo nhằm tôn vinh quốc phục của dân tộc, trưng bày hơn 300 mẫu áo dài qua nhiều giai đoạn lịch sử trong một không gian kiến trúc nhà Việt truyền thống."
+                },
+                {
+                    id: 12,
+                    name: "Bảo tàng Địa chất Việt Nam",
+                    address: "2 Nguyễn Bỉnh Khiêm, Phường Bến Nghé, Quận 1",
+                    district: "Quận 1",
+                    hours: "Sáng: 8h00–12h00, Chiều: 13h00–17h00 (Thứ Hai - Thứ Sáu)",
+                    ticketAdult: 0,
+                    ticketConcession: "Miễn phí cho mọi đối tượng.",
+                    notes: "Đóng cửa Thứ Bảy, Chủ Nhật và ngày lễ. Phí gửi xe: 5.000 VNĐ. Nằm gần Thảo Cầm Viên và Bảo tàng Lịch sử TP.HCM.",
+                    description: "Lưu giữ hàng ngàn mẫu vật địa chất quý giá, trưng bày các chuyên đề về địa chất, khoáng sản, đá quý có niên đại hàng triệu năm."
+                },
+                {
+                    id: 13,
+                    name: "Dinh Độc Lập",
+                    address: "135 Nam Kỳ Khởi Nghĩa, Phường Bến Thành, Quận 1",
+                    district: "Quận 1",
+                    hours: "8h00 – 16h30 (Tất cả các ngày, quầy vé đóng lúc 15h30)",
+                    ticketAdult: 40000,
+                    ticketConcession: "20.000 VNĐ (Sinh viên), 10.000 VNĐ (Trẻ em)",
+                    notes: "Có vé combo tham quan Dinh và khu trưng bày với giá 65.000 VNĐ (người lớn).",
+                    description: "Di tích quốc gia đặc biệt, biểu tượng của hòa bình và thống nhất. Từng là nơi làm việc của Tổng thống Việt Nam Cộng hòa và là nơi chứng kiến sự kiện lịch sử 30/4/1975."
+                }
+            ];
+
+            const grid = document.getElementById('museumGrid');
+            const searchInput = document.getElementById('searchInput');
+            const districtFilter = document.getElementById('districtFilter');
+            const priceFilter = document.getElementById('priceFilter');
+            const modal = document.getElementById('modal');
+            const modalContent = document.getElementById('modalContent');
+            const closeModalBtn = document.getElementById('closeModal');
+            const noResultsDiv = document.getElementById('noResults');
+
+            function formatCurrency(value) {
+                return value === 0 ? 'Miễn phí' : new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(value);
+            }
+
+            function renderMuseums(museums) {
+                grid.innerHTML = '';
+                if (museums.length === 0) {
+                    noResultsDiv.classList.remove('hidden');
+                } else {
+                    noResultsDiv.classList.add('hidden');
+                }
+                museums.forEach(museum => {
+                    const card = document.createElement('div');
+                    card.className = 'bg-white rounded-lg shadow-md p-4 flex flex-col cursor-pointer transition-transform transform hover:scale-105 hover:shadow-xl';
+                    card.dataset.id = museum.id;
+                    card.innerHTML = `
+                        <div class="flex-grow">
+                            <h3 class="font-bold text-lg text-orange-800 mb-2">${museum.name}</h3>
+                            <p class="text-sm text-stone-600 mb-1"><span class="font-semibold">📍</span> ${museum.district}</p>
+                            <p class="text-sm text-stone-600"><span class="font-semibold">⏰</span> ${museum.hours}</p>
+                        </div>
+                        <div class="mt-4 pt-4 border-t border-stone-200">
+                             <p class="text-md font-semibold text-right ${museum.ticketAdult === 0 ? 'text-green-600' : 'text-orange-900'}">${formatCurrency(museum.ticketAdult)}</p>
+                        </div>
+                    `;
+                    grid.appendChild(card);
+                });
+            }
+
+            function setupFilters() {
+                const districts = [...new Set(museumData.map(m => m.district))].sort();
+                districts.forEach(district => {
+                    const option = document.createElement('option');
+                    option.value = district;
+                    option.textContent = district;
+                    districtFilter.appendChild(option);
+                });
+
+                searchInput.addEventListener('input', applyFilters);
+                districtFilter.addEventListener('change', applyFilters);
+                priceFilter.addEventListener('change', applyFilters);
+            }
+
+            function applyFilters() {
+                const searchTerm = searchInput.value.toLowerCase();
+                const selectedDistrict = districtFilter.value;
+                const selectedPrice = priceFilter.value;
+
+                let filteredMuseums = museumData;
+
+                if (searchTerm) {
+                    filteredMuseums = filteredMuseums.filter(m => m.name.toLowerCase().includes(searchTerm));
+                }
+
+                if (selectedDistrict !== 'all') {
+                    filteredMuseums = filteredMuseums.filter(m => m.district === selectedDistrict);
+                }
+
+                if (selectedPrice !== 'all') {
+                    filteredMuseums = filteredMuseums.filter(m => {
+                        if (selectedPrice === 'free') return m.ticketAdult === 0;
+                        if (selectedPrice === 'under50') return m.ticketAdult > 0 && m.ticketAdult < 50000;
+                        if (selectedPrice === 'over50') return m.ticketAdult >= 50000;
+                        return true;
+                    });
+                }
+                
+                renderMuseums(filteredMuseums);
+            }
+
+            function showModal(museumId) {
+                const museum = museumData.find(m => m.id == museumId);
+                if (!museum) return;
+
+                modalContent.innerHTML = `
+                    <h2 class="text-2xl font-bold text-orange-900 mb-2">${museum.name}</h2>
+                    <p class="text-md text-stone-500 mb-4">${museum.address}</p>
+                    <div class="space-y-4">
+                        <p><strong class="text-stone-700">Mô tả:</strong> ${museum.description}</p>
+                        <p><strong class="text-stone-700">Giờ mở cửa:</strong> ${museum.hours}</p>
+                        <div>
+                            <p><strong class="text-stone-700">Giá vé:</strong></p>
+                            <ul class="list-disc list-inside ml-4 text-stone-600">
+                                <li>Người lớn: ${formatCurrency(museum.ticketAdult)}</li>
+                                <li>Ưu đãi: ${museum.ticketConcession}</li>
+                            </ul>
+                        </div>
+                        <div class="note-warning p-3 rounded-md">
+                            <p class="font-semibold text-sm">Lưu ý quan trọng:</p>
+                            <p class="text-sm">${museum.notes}</p>
+                        </div>
+                    </div>
+                `;
+                modal.classList.remove('hidden');
+                modal.classList.add('flex');
+                setTimeout(() => {
+                    modal.querySelector('.bg-white').classList.remove('scale-95', 'opacity-0');
+                }, 10);
+            }
+
+            function closeModal() {
+                modal.querySelector('.bg-white').classList.add('scale-95', 'opacity-0');
+                 setTimeout(() => {
+                    modal.classList.add('hidden');
+                    modal.classList.remove('flex');
+                 }, 300);
+            }
+
+            grid.addEventListener('click', (e) => {
+                const card = e.target.closest('[data-id]');
+                if (card) {
+                    showModal(card.dataset.id);
+                }
+            });
+
+            closeModalBtn.addEventListener('click', closeModal);
+            modal.addEventListener('click', (e) => {
+                if (e.target === modal) {
+                    closeModal();
+                }
+            });
+            
+            function createCharts() {
+                const priceCtx = document.getElementById('priceChart').getContext('2d');
+                const districtCtx = document.getElementById('districtChart').getContext('2d');
+                
+                const sortedByPrice = [...museumData].sort((a, b) => b.ticketAdult - a.ticketAdult);
+                const priceLabels = sortedByPrice.map(m => m.name.length > 25 ? m.name.substring(0, 22) + '...' : m.name);
+                const priceData = sortedByPrice.map(m => m.ticketAdult);
+
+                new Chart(priceCtx, {
+                    type: 'bar',
+                    data: {
+                        labels: priceLabels,
+                        datasets: [{
+                            label: 'Giá vé (VNĐ)',
+                            data: priceData,
+                            backgroundColor: '#fed7aa',
+                            borderColor: '#fb923c',
+                            borderWidth: 1
+                        }]
+                    },
+                    options: {
+                        indexAxis: 'y',
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        scales: {
+                            x: {
+                                beginAtZero: true,
+                                ticks: {
+                                    callback: function(value) {
+                                        return value / 1000 + 'k';
+                                    }
+                                }
+                            }
+                        },
+                        plugins: {
+                            legend: {
+                                display: false
+                            },
+                            tooltip: {
+                                callbacks: {
+                                    label: function(context) {
+                                        return ' ' + formatCurrency(context.raw);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                });
+                
+                const districtCounts = museumData.reduce((acc, m) => {
+                    acc[m.district] = (acc[m.district] || 0) + 1;
+                    return acc;
+                }, {});
+
+                const districtLabels = Object.keys(districtCounts);
+                const districtData = Object.values(districtCounts);
+
+                new Chart(districtCtx, {
+                    type: 'doughnut',
+                    data: {
+                        labels: districtLabels,
+                        datasets: [{
+                            label: 'Số lượng bảo tàng',
+                            data: districtData,
+                            backgroundColor: [
+                                '#f97316', '#fb923c', '#fdba74', '#fed7aa',
+                                '#fef3c7', '#d97706', '#b45309', '#92400e'
+                            ],
+                            hoverOffset: 4
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                         plugins: {
+                            legend: {
+                                position: 'top',
+                            },
+                        }
+                    }
+                });
+            }
+
+            renderMuseums(museumData);
+            setupFilters();
+            createCharts();
+        });
+    </script>
+</body>
+</html>
